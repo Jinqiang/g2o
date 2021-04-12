@@ -26,15 +26,20 @@
 
 #include "vertex_se3.h"
 #include "g2o/core/factory.h"
+#ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
+#endif
 
 #include <iostream>
 #include "g2o/core/cache.h"
 
+using namespace Eigen;
+
 namespace g2o {
 
   VertexSE3::VertexSE3() :
-    BaseVertex<6, Eigen::Isometry3d>(),
+    BaseVertex<6, Isometry3>(),
     _numOplusCalls(0)
   {
     setToOriginImpl();
@@ -43,34 +48,30 @@ namespace g2o {
 
   bool VertexSE3::read(std::istream& is)
   {
-    Vector7d est;
-    for (int i=0; i<7; i++)
-      is  >> est[i];
+    Vector7 est;
+    bool state = internal::readVector(is, est);
     setEstimate(internal::fromVectorQT(est));
-    return true;
+    return state;
   }
 
   bool VertexSE3::write(std::ostream& os) const
   {
-    Vector7d est=internal::toVectorQT(_estimate);
-    for (int i=0; i<7; i++)
-      os << est[i] << " ";
-    return os.good();
+    return internal::writeVector(os, internal::toVectorQT(estimate()));
   }
 
   VertexSE3WriteGnuplotAction::VertexSE3WriteGnuplotAction(): WriteGnuplotAction(typeid(VertexSE3).name()){}
 
   HyperGraphElementAction* VertexSE3WriteGnuplotAction::operator()(HyperGraph::HyperGraphElement* element, HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     WriteGnuplotAction::Parameters* params=static_cast<WriteGnuplotAction::Parameters*>(params_);
     if (!params->os){
       std::cerr << __PRETTY_FUNCTION__ << ": warning, no valid os specified" << std::endl;
-      return 0;
+      return nullptr;
     }
-    
+
     VertexSE3* v =  static_cast<VertexSE3*>(element);
-    Vector6d est=internal::toVectorMQT(v->estimate());
+    Vector6 est=internal::toVectorMQT(v->estimate());
     for (int i=0; i<6; i++)
       *(params->os) << est[i] << " ";
     *(params->os) << std::endl;
@@ -79,22 +80,23 @@ namespace g2o {
 
 #ifdef G2O_HAVE_OPENGL
   void drawTriangle(float xSize, float ySize){
-    Vector3f p[3];
+    Vector3F p[3];
     glBegin(GL_TRIANGLES);
     p[0] << 0., 0., 0.;
     p[1] << -xSize, ySize, 0.;
     p[2] << -xSize, -ySize, 0.;
     for (int i = 1; i < 2; ++i) {
-      Vector3f normal = (p[i] - p[0]).cross(p[i+1] - p[0]);
+      Vector3F normal = (p[i] - p[0]).cross(p[i+1] - p[0]);
       glNormal3f(normal.x(), normal.y(), normal.z());
       glVertex3f(p[0].x(), p[0].y(), p[0].z());
       glVertex3f(p[i].x(), p[i].y(), p[i].z());
       glVertex3f(p[i+1].x(), p[i+1].y(), p[i+1].z());
-    }    
+    }
     glEnd();
   }
 
-  VertexSE3DrawAction::VertexSE3DrawAction(): DrawAction(typeid(VertexSE3).name()){
+  VertexSE3DrawAction::VertexSE3DrawAction()
+      : DrawAction(typeid(VertexSE3).name()), _triangleX(nullptr), _triangleY(nullptr) {
     _cacheDrawActions = 0;
   }
 
@@ -111,41 +113,27 @@ namespace g2o {
     return true;
   }
 
-  HyperGraphElementAction* VertexSE3DrawAction::operator()(HyperGraph::HyperGraphElement* element, 
+  HyperGraphElementAction* VertexSE3DrawAction::operator()(HyperGraph::HyperGraphElement* element,
                  HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
-    if (! _cacheDrawActions){
-      _cacheDrawActions = HyperGraphActionLibrary::instance()->actionByName("draw");
-    }
-
+      return nullptr;
+    initializeDrawActionsCache();
     refreshPropertyPtrs(params_);
+
     if (! _previousParams)
       return this;
-    
+
     if (_show && !_show->value())
       return this;
 
     VertexSE3* that = static_cast<VertexSE3*>(element);
 
-    glColor3f(0.5f,0.5f,0.8f);
+    glColor3f(POSE_VERTEX_COLOR);
     glPushMatrix();
-    glMultMatrixd(that->estimate().matrix().data());
-    if (_triangleX && _triangleY){
-      drawTriangle(_triangleX->value(), _triangleY->value());
-    }
-    CacheContainer* caches=that->cacheContainer();
-    if (caches){
-      for (CacheContainer::iterator it=caches->begin(); it!=caches->end(); it++){
-        Cache* c = it->second;
-        (*_cacheDrawActions)(c, params_);
-      }
-    }
-    OptimizableGraph::Data* d=that->userData();
-    while (d && _cacheDrawActions ){
-      (*_cacheDrawActions)(d, params_);
-      d=d->next();
-    }
+    glMultMatrixd(that->estimate().matrix().cast<double>().eval().data());
+    opengl::drawArrow2D(_triangleX->value(), _triangleY->value(), _triangleX->value()*.3f);
+    drawCache(that->cacheContainer(), params_);
+    drawUserData(that->userData(), params_);
     glPopMatrix();
     return this;
   }

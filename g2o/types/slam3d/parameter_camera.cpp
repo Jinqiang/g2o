@@ -30,6 +30,7 @@
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
 #endif
 
 using namespace std;
@@ -42,12 +43,12 @@ namespace g2o {
     setOffset();
   }
 
-  void ParameterCamera::setOffset(const Eigen::Isometry3d& offset_){
+  void ParameterCamera::setOffset(const Isometry3& offset_){
     ParameterSE3Offset::setOffset(offset_);
     _Kcam_inverseOffsetR = _Kcam * inverseOffset().rotation();
   }
 
-  void ParameterCamera::setKcam(double fx, double fy, double cx, double cy){
+  void ParameterCamera::setKcam(number_t fx, number_t fy, number_t cx, number_t cy){
     _Kcam.setZero();
     _Kcam(0,0) = fx;
     _Kcam(1,1) = fy;
@@ -60,22 +61,19 @@ namespace g2o {
 
 
   bool ParameterCamera::read(std::istream& is) {
-    Vector7d off;
-    for (int i=0; i<7; i++)
-      is >> off[i];
+    Vector7 off;
+    internal::readVector(is, off);
     // normalize the quaternion to recover numerical precision lost by storing as human readable text
-    Vector4d::MapType(off.data()+3).normalize();
+    Vector4::MapType(off.data()+3).normalize();
     setOffset(internal::fromVectorQT(off));
-    double fx,fy,cx,cy;
+    number_t fx,fy,cx,cy;
     is >> fx >> fy >> cx >> cy;
     setKcam(fx,fy,cx,cy);
     return is.good();
   }
-  
+
   bool ParameterCamera::write(std::ostream& os) const {
-    Vector7d off = internal::toVectorQT(_offset);
-    for (int i=0; i<7; i++)
-      os << off[i] << " ";
+    internal::writeVector(os, internal::toVectorQT(_offset));
     os << _Kcam(0,0) << " ";
     os << _Kcam(1,1) << " ";
     os << _Kcam(0,2) << " ";
@@ -96,25 +94,6 @@ namespace g2o {
   }
 
 #ifdef G2O_HAVE_OPENGL
-  static void drawMyPyramid(float height, float side){
-    Vector3f p[6];
-    p[0] << 0, 0., 0.;
-    p[1] << -side, -side, height;
-    p[2] << -side,  side, height;
-    p[3] << side,  side, height;
-    p[4] << side, -side, height;
-    p[5] << -side, -side, height;
-
-    glBegin(GL_TRIANGLES);
-    for (int i = 1; i < 5; ++i) {
-      Vector3f normal = (p[i] - p[0]).cross(p[i+1] - p[0]);
-      glNormal3f(normal.x(), normal.y(), normal.z());
-      glVertex3f(p[0].x(), p[0].y(), p[0].z());
-      glVertex3f(p[i].x(), p[i].y(), p[i].z());
-      glVertex3f(p[i+1].x(), p[i+1].y(), p[i+1].z());
-    }
-    glEnd();
-  }
 
   CacheCameraDrawAction::CacheCameraDrawAction(): DrawAction(typeid(CacheCamera).name()){
     _previousParams = (DrawAction::Parameters*)0x42;
@@ -128,7 +107,7 @@ namespace g2o {
     if (_previousParams){
       _cameraZ = _previousParams->makeProperty<FloatProperty>(_typeName + "::CAMERA_Z", .05f);
       _cameraSide = _previousParams->makeProperty<FloatProperty>(_typeName + "::CAMERA_SIDE", .05f);
-      
+
     } else {
       _cameraZ = 0;
       _cameraSide = 0;
@@ -136,24 +115,26 @@ namespace g2o {
     return true;
   }
 
-  HyperGraphElementAction* CacheCameraDrawAction::operator()(HyperGraph::HyperGraphElement* element, 
+  HyperGraphElementAction* CacheCameraDrawAction::operator()(HyperGraph::HyperGraphElement* element,
                  HyperGraphElementAction::Parameters* params){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     CacheCamera* that = static_cast<CacheCamera*>(element);
     refreshPropertyPtrs(params);
     if (! _previousParams)
       return this;
-    
+
     if (_show && !_show->value())
       return this;
 
+    glPushAttrib(GL_COLOR);
+    glColor3f(POSE_PARAMETER_COLOR);
     glPushMatrix();
-    glMultMatrixd(that->camParams()->offset().data());
-    if (_cameraZ && _cameraSide)
-      drawMyPyramid(_cameraZ->value(), _cameraSide->value());
+    glMultMatrixd(that->camParams()->offset().cast<double>().data());
+    glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
+    opengl::drawPyramid(_cameraSide->value(), _cameraZ->value());
     glPopMatrix();
-
+    glPopAttrib();
     return this;
   }
 #endif

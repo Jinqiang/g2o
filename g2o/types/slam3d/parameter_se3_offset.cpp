@@ -30,6 +30,7 @@
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
 #endif
 
 namespace g2o {
@@ -38,27 +39,22 @@ namespace g2o {
     setOffset();
   }
 
-  void ParameterSE3Offset::setOffset(const Isometry3d& offset_){
+  void ParameterSE3Offset::setOffset(const Isometry3& offset_){
     _offset = offset_;
     _inverseOffset = _offset.inverse();
   }
 
   bool ParameterSE3Offset::read(std::istream& is) {
-    Vector7d off;
-    for (int i=0; i<7; i++) {
-      is >> off[i];
-    }
+    Vector7 off;
+    bool state = internal::readVector(is, off);
     // normalize the quaternion to recover numerical precision lost by storing as human readable text
-    Vector4d::MapType(off.data()+3).normalize();
+    Vector4::MapType(off.data()+3).normalize();
     setOffset(internal::fromVectorQT(off));
-    return is.good();
+    return state;
   }
-  
+
   bool ParameterSE3Offset::write(std::ostream& os) const {
-    Vector7d off =internal::toVectorQT(_offset);
-    for (int i=0; i<7; i++)
-      os << off[i] << " ";
-    return os.good();
+    return internal::writeVector(os, internal::toVectorQT(_offset));
   }
 
   CacheSE3Offset::CacheSE3Offset() :
@@ -77,7 +73,7 @@ namespace g2o {
     _n2w = v->estimate() * _offsetParam->offset();
     _w2n = _n2w.inverse();
     _w2l = v->estimate().inverse();
-  }  
+  }
 
   void CacheSE3Offset::setOffsetParam(ParameterSE3Offset* offsetParam)
   {
@@ -102,24 +98,25 @@ namespace g2o {
     return true;
   }
 
-  HyperGraphElementAction* CacheSE3OffsetDrawAction::operator()(HyperGraph::HyperGraphElement* element, 
-                HyperGraphElementAction::Parameters* params){
+  HyperGraphElementAction* CacheSE3OffsetDrawAction::operator()(HyperGraph::HyperGraphElement* element,
+                HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
-    refreshPropertyPtrs(params);
+      return nullptr;
+    CacheSE3Offset* that = static_cast<CacheSE3Offset*>(element);
+    refreshPropertyPtrs(params_);
     if (! _previousParams)
       return this;
-    
+
     if (_show && !_show->value())
       return this;
-
-    //CacheSE3Offset* that = static_cast<CacheSE3Offset*>(element);
-    //glPushMatrix();
-    //glMultMatrixd(that->offsetParam()->offset().matrix().data());
-    // if (_cubeSide)
-    //   drawMyPyramid(_cubeSide->value(), _cubeSide->value());
-    //glPopMatrix();
-
+    float cs = _cubeSide ? _cubeSide->value() : 1.0f;
+    glPushAttrib(GL_COLOR);
+    glColor3f(POSE_PARAMETER_COLOR);
+    glPushMatrix();
+    glMultMatrixd(that->offsetParam()->offset().cast<double>().data());
+    opengl::drawBox(cs,cs,cs);
+    glPopMatrix();
+    glPopAttrib();
     return this;
   }
 #endif

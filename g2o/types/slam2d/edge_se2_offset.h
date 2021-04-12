@@ -58,15 +58,15 @@ namespace g2o {
         _inverseMeasurement = m.inverse();
       }
 
-      virtual bool setMeasurementData(const double* d){
-        Map<const Vector3d> v(d);
+      virtual bool setMeasurementData(const number_t* d){
+        Eigen::Map<const Vector3> v(d);
         _measurement.fromVector(v);
         _inverseMeasurement = _measurement.inverse();
         return true;
       }
 
-      virtual bool getMeasurementData(double* d) const{
-        Map<Vector3d> v(d);
+      virtual bool getMeasurementData(number_t* d) const{
+        Eigen::Map<Vector3> v(d);
         v = _measurement.toVector();
         return true;
       }
@@ -75,8 +75,8 @@ namespace g2o {
 
       virtual bool setMeasurementFromState() ;
 
-      virtual double initialEstimatePossible(const OptimizableGraph::VertexSet& /*from*/, 
-          OptimizableGraph::Vertex* /*to*/) { 
+      virtual number_t initialEstimatePossible(const OptimizableGraph::VertexSet& /*from*/,
+                                               OptimizableGraph::Vertex* /*to*/) {
         return 1.;
       }
 

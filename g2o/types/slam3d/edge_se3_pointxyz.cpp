@@ -35,16 +35,17 @@
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
 #endif
 
 namespace g2o {
   using namespace std;
 
   // point to camera projection, monocular
-  EdgeSE3PointXYZ::EdgeSE3PointXYZ() : BaseBinaryEdge<3, Vector3d, VertexSE3, VertexPointXYZ>() {
+  EdgeSE3PointXYZ::EdgeSE3PointXYZ() : BaseBinaryEdge<3, Vector3, VertexSE3, VertexPointXYZ>() {
     information().setIdentity();
     J.fill(0);
-    J.block<3,3>(0,0) = -Eigen::Matrix3d::Identity();
+    J.block<3,3>(0,0) = -Matrix3::Identity();
     cache = 0;
     offsetParam = 0;
     resizeParameters(1);
@@ -58,49 +59,28 @@ namespace g2o {
     return cache != 0;
   }
 
-
   bool EdgeSE3PointXYZ::read(std::istream& is) {
-    int pId;
-    is >> pId;
-    setParameterId(0, pId);
-    // measured keypoint
-    Vector3d meas;
-    for (int i=0; i<3; i++) is >> meas[i];
+    readParamIds(is);
+    Vector3 meas;
+    internal::readVector(is, meas);
     setMeasurement(meas);
-    // information matrix is the identity for features, could be changed to allow arbitrary covariances    
-    if (is.bad()) {
-      return false;
-    }
-    for ( int i=0; i<information().rows() && is.good(); i++)
-      for (int j=i; j<information().cols() && is.good(); j++){
-  is >> information()(i,j);
-  if (i!=j)
-    information()(j,i)=information()(i,j);
-      }
-    if (is.bad()) {
-      //  we overwrite the information matrix
-      information().setIdentity();
-    } 
-    return true;
+    readInformationMatrix(is);
+    return is.good() || is.eof();
   }
 
   bool EdgeSE3PointXYZ::write(std::ostream& os) const {
-    os << offsetParam->id() << " ";
-    for (int i=0; i<3; i++) os  << measurement()[i] << " ";
-    for (int i=0; i<information().rows(); i++)
-      for (int j=i; j<information().cols(); j++) {
-        os <<  information()(i,j) << " ";
-      }
-    return os.good();
+    bool state = writeParamIds(os);
+    state &= internal::writeVector(os, measurement());
+    state &= writeInformationMatrix(os);
+    return state;
   }
-
 
   void EdgeSE3PointXYZ::computeError() {
     // from cam to point (track)
     //VertexSE3 *cam = static_cast<VertexSE3*>(_vertices[0]);
     VertexPointXYZ *point = static_cast<VertexPointXYZ*>(_vertices[1]);
 
-    Eigen::Vector3d perr = cache->w2n() * point->estimate();
+    Vector3 perr = cache->w2n() * point->estimate();
 
     // error, which is backwards from the normal observed - calculated
     // _measurement is the measured projection
@@ -112,7 +92,7 @@ namespace g2o {
     //VertexSE3 *cam = static_cast<VertexSE3 *>(_vertices[0]);
     VertexPointXYZ *vp = static_cast<VertexPointXYZ *>(_vertices[1]);
 
-    Eigen::Vector3d Zcam = cache->w2l() * vp->estimate();
+    Vector3 Zcam = cache->w2l() * vp->estimate();
 
     //  J(0,3) = -0.0;
     J(0,4) = -2*Zcam(2);
@@ -128,10 +108,14 @@ namespace g2o {
 
     J.block<3,3>(0,6) = cache->w2l().rotation();
 
-    Eigen::Matrix<double,3,9> Jhom = offsetParam->inverseOffset().rotation() * J;
+    Eigen::Matrix<number_t,3,9,Eigen::ColMajor> Jhom = offsetParam->inverseOffset().rotation() * J;
 
     _jacobianOplusXi = Jhom.block<3,6>(0,0);
     _jacobianOplusXj = Jhom.block<3,3>(0,6);
+
+    // std::cerr << "just linearized." << std::endl;
+    // std::cerr << "_jacobianOplusXi:" << std::endl << _jacobianOplusXi << std::endl;
+    // std::cerr << "_jacobianOplusXj:" << std::endl << _jacobianOplusXj << std::endl;
   }
 
 
@@ -140,21 +124,21 @@ namespace g2o {
     VertexPointXYZ *point = static_cast<VertexPointXYZ*>(_vertices[1]);
 
     // calculate the projection
-    const Vector3d &pt = point->estimate();
+    const Vector3 &pt = point->estimate();
     // SE3OffsetCache* vcache = (SE3OffsetCache*) cam->getCache(_cacheIds[0]);
     // if (! vcache){
     //   cerr << "fatal error in retrieving cache" << endl;
     // }
 
-    Eigen::Vector3d perr = cache->w2n() * pt;
+    Vector3 perr = cache->w2n() * pt;
     _measurement = perr;
     return true;
   }
 
 
-  void EdgeSE3PointXYZ::initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* /*to_*/)
+  void EdgeSE3PointXYZ::initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to)
   {
-    (void) from;
+    (void) from; (void) to;
     assert(from.size() == 1 && from.count(_vertices[0]) == 1 && "Can not initialize VertexDepthCam position by VertexTrackXYZ");
 
     VertexSE3 *cam = dynamic_cast<VertexSE3*>(_vertices[0]);
@@ -164,7 +148,7 @@ namespace g2o {
     //   cerr << "fatal error in retrieving cache" << endl;
     // }
     // SE3OffsetParameters* params=vcache->params;
-    Eigen::Vector3d p=_measurement;
+    Vector3 p=_measurement;
     point->setEstimate(cam->estimate() * (offsetParam->offset() * p));
   }
 
@@ -174,7 +158,7 @@ namespace g2o {
   HyperGraphElementAction* EdgeSE3PointXYZDrawAction::operator()(HyperGraph::HyperGraphElement* element,
                HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     refreshPropertyPtrs(params_);
     if (! _previousParams)
       return this;
@@ -185,11 +169,14 @@ namespace g2o {
     EdgeSE3PointXYZ* e =  static_cast<EdgeSE3PointXYZ*>(element);
     VertexSE3* fromEdge = static_cast<VertexSE3*>(e->vertex(0));
     VertexPointXYZ* toEdge   = static_cast<VertexPointXYZ*>(e->vertex(1));
-    glColor3f(0.8f,0.3f,0.3f);
+    if (! fromEdge || ! toEdge)
+      return this;
+    Isometry3 fromTransform=fromEdge->estimate() * e->offsetParameter()->offset();
+    glColor3f(LANDMARK_EDGE_COLOR);
     glPushAttrib(GL_ENABLE_BIT);
     glDisable(GL_LIGHTING);
     glBegin(GL_LINES);
-    glVertex3f((float)fromEdge->estimate().translation().x(),(float)fromEdge->estimate().translation().y(),(float)fromEdge->estimate().translation().z());
+    glVertex3f((float)fromTransform.translation().x(),(float)fromTransform.translation().y(),(float)fromTransform.translation().z());
     glVertex3f((float)toEdge->estimate().x(),(float)toEdge->estimate().y(),(float)toEdge->estimate().z());
     glEnd();
     glPopAttrib();

@@ -30,6 +30,7 @@
 
 namespace g2o {
   using namespace std;
+  using namespace Eigen;
 
   SensorPose3D::SensorPose3D(const std::string& name_): BinarySensor<Robot3D, EdgeSE3, WorldObjectSE3>(name_){  
     _stepsToIgnore = 10;
@@ -85,11 +86,11 @@ namespace g2o {
       if (!_robotPoseObject)
   _robotPoseObject = *it;
       _posesToIgnore.insert(*it);
-      it++;
+      ++it;
       count++;
     }
     for (std::set<BaseWorldObject*>::iterator it=world()->objects().begin();
-   it!=world()->objects().end(); it++){
+   it!=world()->objects().end(); ++it){
       WorldObjectType* o=dynamic_cast<WorldObjectType*>(*it);
       if (o && isVisible(o)){
   EdgeType* e=mkEdge(o);  

@@ -28,6 +28,7 @@
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
 #endif
 
 namespace g2o {
@@ -43,13 +44,12 @@ namespace g2o {
 
     if (from.count(_vertices[0]) != 1)
       return;
-    double r=2.;
+    number_t r=2.;
     const VertexSE2* v1 = static_cast<const VertexSE2*>(_vertices[0]);
     VertexPointXY* l2 = static_cast<VertexPointXY*>(_vertices[1]);
     SE2 t=v1->estimate();
-    t.setRotation(t.rotation().angle()+_measurement);
-    Vector2d vr;
-    vr[0]=r; vr[1]=0;
+    t.setRotation(t.rotation()*Rotation2D(_measurement));
+    Vector2 vr(r, 0.);
     l2->setEstimate(t*vr);
   }
 
@@ -71,11 +71,11 @@ namespace g2o {
   HyperGraphElementAction* EdgeSE2PointXYBearingWriteGnuplotAction::operator()(HyperGraph::HyperGraphElement* element,
                          HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     WriteGnuplotAction::Parameters* params=static_cast<WriteGnuplotAction::Parameters*>(params_);
     if (!params->os){
       std::cerr << __PRETTY_FUNCTION__ << ": warning, on valid os specified" << std::endl;
-      return 0;
+      return nullptr;
     }
 
     EdgeSE2PointXYBearing* e =  static_cast<EdgeSE2PointXYBearing*>(element);
@@ -93,7 +93,7 @@ namespace g2o {
 
   HyperGraphElementAction* EdgeSE2PointXYBearingDrawAction::operator()(HyperGraph::HyperGraphElement* element,  HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
 
     refreshPropertyPtrs(params_);
     if (! _previousParams)
@@ -103,13 +103,33 @@ namespace g2o {
       return this;
 
     EdgeSE2PointXYBearing* e =  static_cast<EdgeSE2PointXYBearing*>(element);
-    VertexSE2* fromEdge = static_cast<VertexSE2*>(e->vertex(0));
-    VertexPointXY* toEdge   = static_cast<VertexPointXY*>(e->vertex(1));
-    glColor3f(0.3f,0.3f,0.1f);
+    VertexSE2* from = static_cast<VertexSE2*>(e->vertex(0));
+    VertexPointXY* to   = static_cast<VertexPointXY*>(e->vertex(1));
+    if (! from)
+      return this;
+    number_t guessRange=5;
+    number_t theta = e->measurement();
+    Vector2 p(std::cos(theta)*guessRange, std::sin(theta)*guessRange);
+    glPushAttrib(GL_ENABLE_BIT|GL_LIGHTING|GL_COLOR);
+    glDisable(GL_LIGHTING);
+    if (!to){
+      p=from->estimate()*p;
+      glColor3f(LANDMARK_EDGE_GHOST_COLOR);
+      glPushAttrib(GL_POINT_SIZE);
+      glPointSize(3);
+      glBegin(GL_POINTS);
+      glVertex3f((float)p.x(),(float)p.y(),0.f);
+      glEnd();
+      glPopAttrib();
+    } else {
+      p=to->estimate();
+      glColor3f(LANDMARK_EDGE_COLOR);
+    }
     glBegin(GL_LINES);
-    glVertex3f((float)fromEdge->estimate().translation().x(),(float)fromEdge->estimate().translation().y(),0.f);
-    glVertex3f((float)toEdge->estimate().x(),(float)toEdge->estimate().y(),0.f);
+    glVertex3f((float)from->estimate().translation().x(),(float)from->estimate().translation().y(),0.f);
+    glVertex3f((float)p.x(),(float)p.y(),0.f);
     glEnd();
+    glPopAttrib();
     return this;
   }
 #endif

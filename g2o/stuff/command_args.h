@@ -30,7 +30,6 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <sstream>
 
 #include "g2o_stuff_api.h"
 
@@ -54,11 +53,10 @@ class G2O_STUFF_API CommandArgs
       void* data;
       bool parsed;
       bool optional;
-      CommandArgument() : name(""), description(""), type(0), data(0), parsed(false), optional(false)
+      CommandArgument() : name(""), description(""), type(0), data(nullptr), parsed(false), optional(false)
       {}
     };
   public:
-    CommandArgs();
     virtual ~CommandArgs();
 
     /**
@@ -116,8 +114,6 @@ class G2O_STUFF_API CommandArgs
     const char* type2str(int t) const;
     void str2arg(const std::string& input, CommandArgument& ca) const;
     std::string arg2str(const CommandArgument& ca) const;
-
-    std::string trim(const std::string& s) const;
 };
 
 } // end namespace

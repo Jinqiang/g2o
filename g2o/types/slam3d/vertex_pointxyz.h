@@ -35,7 +35,7 @@ namespace g2o {
   /**
    * \brief Vertex for a tracked point in space
    */
-  class G2O_TYPES_SLAM3D_API VertexPointXYZ : public BaseVertex<3, Eigen::Vector3d>
+  class G2O_TYPES_SLAM3D_API VertexPointXYZ : public BaseVertex<3, Vector3>
   {
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -45,40 +45,40 @@ namespace g2o {
 
       virtual void setToOriginImpl() { _estimate.fill(0.); }
 
-      virtual void oplusImpl(const double* update_) {
-        Map<const Vector3d> update(update_);
+      virtual void oplusImpl(const number_t* update_) {
+        Eigen::Map<const Vector3> update(update_);
         _estimate += update;
       }
 
-      virtual bool setEstimateDataImpl(const double* est){
-        Map<const Vector3d> _est(est);
-        _estimate = _est;
+      virtual bool setEstimateDataImpl(const number_t* est){
+        Eigen::Map<const Vector3> estMap(est);
+        _estimate = estMap;
         return true;
       }
 
-      virtual bool getEstimateData(double* est) const{
-        Map<Vector3d> _est(est);
-        _est = _estimate;
+      virtual bool getEstimateData(number_t* est) const{
+        Eigen::Map<Vector3> estMap(est);
+        estMap = _estimate;
         return true;
       }
 
       virtual int estimateDimension() const {
-        return 3;
+        return Dimension;
       }
 
-      virtual bool setMinimalEstimateDataImpl(const double* est){
-        _estimate = Map<const Vector3d>(est);
+      virtual bool setMinimalEstimateDataImpl(const number_t* est){
+        _estimate = Eigen::Map<const Vector3>(est);
         return true;
       }
 
-      virtual bool getMinimalEstimateData(double* est) const{
-        Map<Vector3d> v(est);
+      virtual bool getMinimalEstimateData(number_t* est) const{
+        Eigen::Map<Vector3> v(est);
         v = _estimate;
         return true;
       }
 
       virtual int minimalEstimateDimension() const {
-        return 3;
+        return Dimension;
       }
 
   };
@@ -97,7 +97,7 @@ namespace g2o {
   class VertexPointXYZDrawAction: public DrawAction{
     public:
       VertexPointXYZDrawAction();
-      virtual HyperGraphElementAction* operator()(HyperGraph::HyperGraphElement* element, 
+      virtual HyperGraphElementAction* operator()(HyperGraph::HyperGraphElement* element,
           HyperGraphElementAction::Parameters* params_);
 
 

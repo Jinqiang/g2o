@@ -29,6 +29,7 @@
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
+#include "g2o/stuff/opengl_primitives.h"
 #endif
 
 namespace g2o {
@@ -40,30 +41,28 @@ namespace g2o {
 
   bool VertexSE2::read(std::istream& is)
   {
-    Eigen::Vector3d p;
-    is >> p[0] >> p[1] >> p[2];
+    Vector3 p;
+    bool state = internal::readVector(is, p);
     setEstimate(p);
-    return true;
+    return state;
   }
 
   bool VertexSE2::write(std::ostream& os) const
   {
-    Eigen::Vector3d p = estimate().toVector();
-    os << p[0] << " " << p[1] << " " << p[2];
-    return os.good();
+    return internal::writeVector(os, estimate().toVector());
   }
 
   VertexSE2WriteGnuplotAction::VertexSE2WriteGnuplotAction(): WriteGnuplotAction(typeid(VertexSE2).name()){}
 
   HyperGraphElementAction* VertexSE2WriteGnuplotAction::operator()(HyperGraph::HyperGraphElement* element, HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     WriteGnuplotAction::Parameters* params=static_cast<WriteGnuplotAction::Parameters*>(params_);
     if (!params || !params->os){
       std::cerr << __PRETTY_FUNCTION__ << ": warning, no valid output stream specified" << std::endl;
-      return 0;
+      return nullptr;
     }
-    
+
     VertexSE2* v =  static_cast<VertexSE2*>(element);
     *(params->os) << v->estimate().translation().x() << " " << v->estimate().translation().y()
       << " " << v->estimate().rotation().angle() << std::endl;
@@ -71,9 +70,8 @@ namespace g2o {
   }
 
 #ifdef G2O_HAVE_OPENGL
-  VertexSE2DrawAction::VertexSE2DrawAction(): DrawAction(typeid(VertexSE2).name()){
-    _drawActions = 0;
-  }
+  VertexSE2DrawAction::VertexSE2DrawAction()
+      : DrawAction(typeid(VertexSE2).name()), _drawActions(nullptr), _triangleX(nullptr), _triangleY(nullptr) {}
 
   bool VertexSE2DrawAction::refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_){
     if (!DrawAction::refreshPropertyPtrs(params_))
@@ -89,47 +87,29 @@ namespace g2o {
   }
 
 
-  HyperGraphElementAction* VertexSE2DrawAction::operator()(HyperGraph::HyperGraphElement* element, 
+  HyperGraphElementAction* VertexSE2DrawAction::operator()(HyperGraph::HyperGraphElement* element,
                  HyperGraphElementAction::Parameters* params_){
-    if (typeid(*element).name()!=_typeName)
-      return 0;
-
-    if (! _drawActions){
-      _drawActions = HyperGraphActionLibrary::instance()->actionByName("draw");
-    }
-
+   if (typeid(*element).name()!=_typeName)
+      return nullptr;
+    initializeDrawActionsCache();
     refreshPropertyPtrs(params_);
+
     if (! _previousParams)
       return this;
 
+    if (_show && !_show->value())
+      return this;
 
     VertexSE2* that = static_cast<VertexSE2*>(element);
 
-    glColor3f(0.5f,0.5f,0.8f);
-    glPushAttrib(GL_ENABLE_BIT);
-    glDisable(GL_LIGHTING);
+    glColor3f(POSE_VERTEX_COLOR);
     glPushMatrix();
     glTranslatef((float)that->estimate().translation().x(),(float)that->estimate().translation().y(),0.f);
     glRotatef((float)RAD2DEG(that->estimate().rotation().angle()),0.f,0.f,1.f);
-    if (_show && _show->value()) {
-      float tx=0.1f, ty=0.05f;
-      if (_triangleX && _triangleY){
-	tx=_triangleX->value();
-	ty=_triangleY->value();
-      }
-      glBegin(GL_TRIANGLE_FAN);
-      glVertex3f( tx ,0.f ,0.f);
-      glVertex3f(-tx ,-ty, 0.f);
-      glVertex3f(-tx , ty, 0.f);
-      glEnd();
-    }
-    OptimizableGraph::Data* d=that->userData();
-    while (d && _drawActions ){
-      (*_drawActions)(d, params_);
-      d=d->next();
-    }
+    opengl::drawArrow2D((float)_triangleX->value(), (float)_triangleY->value(), (float)_triangleX->value()*.3f);
+    drawCache(that->cacheContainer(), params_);
+    drawUserData(that->userData(), params_);
     glPopMatrix();
-    glPopAttrib();
     return this;
   }
 #endif

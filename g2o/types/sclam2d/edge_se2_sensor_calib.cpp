@@ -25,14 +25,14 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "edge_se2_sensor_calib.h"
+#ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
-
+#endif
 namespace g2o {
 
   EdgeSE2SensorCalib::EdgeSE2SensorCalib() :
-    BaseMultiEdge<3, SE2>()
+    BaseFixedSizedEdge<3, SE2, VertexSE2, VertexSE2, VertexSE2>()
   {
-    resize(3);
   }
 
   void EdgeSE2SensorCalib::initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to)
@@ -52,31 +52,21 @@ namespace g2o {
 
   bool EdgeSE2SensorCalib::read(std::istream& is)
   {
-    Vector3d p;
-    is >> p(0) >> p(1) >> p(2);
+    Vector3 p;
+    internal::readVector(is, p);
     _measurement.fromVector(p);
     _inverseMeasurement=measurement().inverse();
-    for (int i = 0; i < information().rows(); ++i)
-      for (int j = i; j < information().cols(); ++j) {
-        is >> information()(i, j);
-        if (i != j)
-          information()(j, i) = information()(i, j);
-      }
-    return true;
+    return readInformationMatrix(is);
   }
 
   bool EdgeSE2SensorCalib::write(std::ostream& os) const
   {
-    Vector3d p = measurement().toVector();
-    os << p(0) << " " << p(1) << " " << p(2);
-    for (int i = 0; i < information().rows(); ++i)
-      for (int j = i; j < information().cols(); ++j)
-        os << " " << information()(i, j);
-    return os.good();
+    internal::writeVector(os, measurement().toVector());
+    return writeInformationMatrix(os);
   }
 
 #ifdef G2O_HAVE_OPENGL
-  EdgeSE2SensorCalibDrawAction::EdgeSE2SensorCalibDrawAction() : 
+  EdgeSE2SensorCalibDrawAction::EdgeSE2SensorCalibDrawAction() :
     DrawAction(typeid(EdgeSE2SensorCalib).name())
   {
   }
@@ -84,7 +74,7 @@ namespace g2o {
   HyperGraphElementAction* EdgeSE2SensorCalibDrawAction::operator()(HyperGraph::HyperGraphElement* element, HyperGraphElementAction::Parameters* )
   {
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
     EdgeSE2SensorCalib* e = static_cast<EdgeSE2SensorCalib*>(element);
     VertexSE2* fromEdge = static_cast<VertexSE2*>(e->vertex(0));
     VertexSE2* toEdge   = static_cast<VertexSE2*>(e->vertex(1));

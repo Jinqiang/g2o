@@ -29,42 +29,41 @@
 
 #include <Eigen/Core>
 #include <Eigen/Cholesky>
-#include<Eigen/StdVector>
 
 namespace g2o {
-  using namespace Eigen;
   
   template <class SampleType>
   struct SigmaPoint {
-    SigmaPoint(const SampleType& sample, double wi, double wp):
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    SigmaPoint(const SampleType& sample, number_t wi, number_t wp):
       _sample(sample), _wi(wi), _wp(wp){}
     SigmaPoint(): _wi(0), _wp(0) {}
     SampleType _sample;
-    double _wi;
-    double _wp;
+    number_t _wi;
+    number_t _wp;
   };
   
   
   template <class SampleType, class CovarianceType>
-  bool sampleUnscented(std::vector<SigmaPoint <SampleType> >& sigmaPoints, const SampleType& mean, const CovarianceType& covariance){
+  bool sampleUnscented(std::vector<SigmaPoint <SampleType>, Eigen::aligned_allocator<SigmaPoint <SampleType> > >& sigmaPoints, const SampleType& mean, const CovarianceType& covariance){
 
     const int dim = mean.size();
     const int numPoints = 2 * dim + 1;
     assert (covariance.rows() == covariance.cols() && covariance.cols() == mean.size() && "Dimension Mismatch");
-    const double alpha = 1e-3;
-    const double beta  = 2.;
-    const double lambda = alpha * alpha * dim;
-    const double wi = 1./(2. * (dim + lambda) );
+    const number_t alpha = cst(1e-3);
+    const number_t beta  = 2;
+    const number_t lambda = alpha * alpha * dim;
+    const number_t wi = cst(1) / (2 * (dim + lambda) );
     
     sigmaPoints.resize(numPoints);
     sigmaPoints[0] = SigmaPoint<SampleType>(mean, 
               lambda/(dim + lambda), 
               lambda/(dim + lambda) + (1.-alpha*alpha+beta) ); 
-    LLT<CovarianceType> cholDecomp;
+    Eigen::LLT<CovarianceType> cholDecomp;
     cholDecomp.compute(covariance*(dim+lambda));
     if (cholDecomp.info()==Eigen::NumericalIssue)
       return false;
-    CovarianceType L=cholDecomp.matrixL();
+    const CovarianceType& L=cholDecomp.matrixL();
     int k=1;
     for (int i=0; i<dim; i++) {
       SampleType s(L.col(i));
@@ -75,7 +74,8 @@ namespace g2o {
   }
 
   template <class SampleType, class CovarianceType>
-  void reconstructGaussian(SampleType& mean, CovarianceType& covariance, const std::vector<SigmaPoint<SampleType> >& sigmaPoints){
+  void reconstructGaussian(SampleType& mean, CovarianceType& covariance,
+			   const std::vector<SigmaPoint<SampleType>, Eigen::aligned_allocator<SigmaPoint <SampleType> > >& sigmaPoints){
 
     mean.fill(0);
     covariance.fill(0);

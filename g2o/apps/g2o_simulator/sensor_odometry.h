@@ -34,6 +34,7 @@ namespace g2o {
   class SensorOdometry: public BinarySensor<R, E, O > {
   public:
   SensorOdometry(const std::string name_): BinarySensor<R, E, O> (name_){};
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     virtual void sense(){
       if (!  BinarySensor<R, E, O>::robot())
   return;
@@ -46,11 +47,11 @@ namespace g2o {
       std::list<PoseObject*>::reverse_iterator it=r->trajectory().rbegin();
       if (it!=r->trajectory().rend()){
   pcurr = *it; 
-  it++;
+  ++it;
       }
       if (it!=r->trajectory().rend()){
   pprev = *it; 
-  it++;
+  ++it;
       }
       if (!(pcurr&&pprev)) {
   cerr << __PRETTY_FUNCTION__ << ": fatal, trajectory empty" << endl;

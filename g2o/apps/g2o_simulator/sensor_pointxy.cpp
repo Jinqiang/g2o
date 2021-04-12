@@ -26,6 +26,8 @@
 
 #include "sensor_pointxy.h"
 
+using namespace Eigen;
+
 namespace g2o{
 
   SensorPointXY::SensorPointXY(const std::string& name_): BinarySensor<Robot2D, EdgeSE2PointXY, WorldObjectPointXY>(name_) {}
@@ -66,11 +68,11 @@ namespace g2o{
     while (it!=r->trajectory().rend() && count < 1){
       if (!_robotPoseObject)
   _robotPoseObject = *it;
-      it++;
+      ++it;
       count++;
     }
     for (std::set<BaseWorldObject*>::iterator it=world()->objects().begin();
-   it!=world()->objects().end(); it++){
+   it!=world()->objects().end(); ++it){
       WorldObjectType* o=dynamic_cast<WorldObjectType*>(*it);
       if (o && isVisible(o)){
   EdgeType* e=mkEdge(o);  

@@ -36,7 +36,7 @@
 
 namespace g2o {
 
-  class G2O_TYPES_SLAM2D_API VertexPointXY : public BaseVertex<2, Eigen::Vector2d>
+  class G2O_TYPES_SLAM2D_API VertexPointXY : public BaseVertex<2, Vector2>
   {
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -46,35 +46,35 @@ namespace g2o {
         _estimate.setZero();
       }
 
-      virtual bool setEstimateDataImpl(const double* est){
-  _estimate[0] = est[0];
-  _estimate[1] = est[1];
-  return true;
+      virtual bool setEstimateDataImpl(const number_t* est){
+        _estimate[0] = est[0];
+        _estimate[1] = est[1];
+        return true;
       }
 
-      virtual bool getEstimateData(double* est) const{
-  est[0] = _estimate[0];
-  est[1] = _estimate[1];
-  return true;
+      virtual bool getEstimateData(number_t* est) const{
+        est[0] = _estimate[0];
+        est[1] = _estimate[1];
+        return true;
       }
-      
+
       virtual int estimateDimension() const { 
-  return 2;
+        return 2;
       }
 
-      virtual bool setMinimalEstimateDataImpl(const double* est){
-  return setEstimateData(est);
+      virtual bool setMinimalEstimateDataImpl(const number_t* est){
+        return setEstimateData(est);
       }
 
-      virtual bool getMinimalEstimateData(double* est) const{
-  return getEstimateData(est);
+      virtual bool getMinimalEstimateData(number_t* est) const{
+        return getEstimateData(est);
       }
-      
+
       virtual int minimalEstimateDimension() const { 
-  return 2;
+        return 2;
       }
 
-      virtual void oplusImpl(const double* update)
+      virtual void oplusImpl(const number_t* update)
       {
         _estimate[0] += update[0];
         _estimate[1] += update[1];

@@ -1,3 +1,29 @@
+// g2o - General Graph Optimization
+// Copyright (C) 2011 R. Kuemmerle, G. Grisetti, H. Strasdat, W. Burgard
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+// * Redistributions of source code must retain the above copyright notice,
+//   this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+// TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+// LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "simutils.h"
 
 namespace g2o {
@@ -8,10 +34,10 @@ namespace g2o {
   // 3: all clipped
   using namespace Eigen;
 
-  int clipSegmentCircle(Vector2d& p1, Vector2d& p2, double r) {
+  int clipSegmentCircle(Eigen::Vector2d& p1, Eigen::Vector2d& p2, double r) {
     double r2=r*r;
-    Vector2d pBase=p1;
-    Vector2d dp=p2-p1;
+    Eigen::Vector2d pBase=p1;
+    Eigen::Vector2d dp=p2-p1;
     double length=dp.norm();
     dp.normalize();
     double p=2*dp.dot(p1);
@@ -51,7 +77,7 @@ namespace g2o {
   // 1: p2clipped
   // 2: inside
 
-  int clipSegmentLine(Vector2d& p1, Vector2d& p2, double a, double b, double c ){
+  int clipSegmentLine(Eigen::Vector2d& p1, Eigen::Vector2d& p2, double a, double b, double c ){
     bool p1inside = true;
     bool p2inside = true;
     if (a*p1.x()+b*p1.y()+c < 0){
@@ -65,7 +91,7 @@ namespace g2o {
     if (!p1inside && !p2inside)
       return -1;
 
-    Vector2d dp=p2-p1;
+    Eigen::Vector2d dp=p2-p1;
     double den=a*dp.x()+b*dp.y();
     if (den==0)
       return -1;
@@ -79,7 +105,7 @@ namespace g2o {
     return 0;
   }
 
-  int clipSegmentFov(Vector2d& p1, Vector2d& p2, double min, double max){
+  int clipSegmentFov(Eigen::Vector2d& p1, Eigen::Vector2d& p2, double min, double max){
     bool clip1 = false, clip2 = false;
     // normal to the first line
     double amin =  sin(min), bmin = -cos(min);
@@ -117,11 +143,11 @@ namespace g2o {
     return 2;
   }
 
-  Vector2d computeLineParameters(const Vector2d& p1, const Vector2d& p2){
-    Vector2d lp;
-    Vector2d dp=p2-p1;
+  Eigen::Vector2d computeLineParameters(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2){
+    Eigen::Vector2d lp;
+    Eigen::Vector2d dp=p2-p1;
     lp[0]=atan2(-dp.x(), dp.y());
-    Vector2d n(cos(lp[0]), sin(lp[0]));
+    Eigen::Vector2d n(cos(lp[0]), sin(lp[0]));
     lp[1]=n.dot(p1+p2)*.5;
     return lp;
   } 

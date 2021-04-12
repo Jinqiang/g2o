@@ -26,6 +26,8 @@
 
 #include "sensor_pose2d.h"
 
+using namespace Eigen;
+
 namespace g2o{
   SensorPose2D::SensorPose2D(const std::string& name_):
     BinarySensor<Robot2D, EdgeSE2, WorldObjectSE2>(name_)
@@ -77,11 +79,11 @@ namespace g2o{
       if (!_robotPoseObject)
   _robotPoseObject = *it;
       _posesToIgnore.insert(*it);
-      it++;
+      ++it;
       count++;
     }
     for (std::set<BaseWorldObject*>::iterator it=world()->objects().begin();
-   it!=world()->objects().end(); it++){
+   it!=world()->objects().end(); ++it){
       WorldObjectType* o=dynamic_cast<WorldObjectType*>(*it);
       if (o && isVisible(o)){
 	EdgeType* e=mkEdge(o);  

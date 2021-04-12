@@ -24,63 +24,33 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <Eigen/StdVector>
-#include <iostream>
 #include <stdint.h>
 
-#ifdef _MSC_VER
+#include <iostream>
 #include <unordered_set>
+
+#include "g2o/core/optimization_algorithm_factory.h"
+#include "g2o/core/robust_kernel_impl.h"
+#include "g2o/core/sparse_optimizer.h"
+#include "g2o/solvers/structure_only/structure_only_solver.h"
+#include "g2o/stuff/sampler.h"
+#include "g2o/types/sba/types_six_dof_expmap.h"
+
+#if defined G2O_HAVE_CHOLMOD
+G2O_USE_OPTIMIZATION_LIBRARY(cholmod);
 #else
-#include <tr1/unordered_set>
+G2O_USE_OPTIMIZATION_LIBRARY(eigen);
 #endif
 
-#include "g2o/core/sparse_optimizer.h"
-#include "g2o/core/block_solver.h"
-#include "g2o/core/solver.h"
-#include "g2o/core/robust_kernel_impl.h"
-#include "g2o/core/optimization_algorithm_levenberg.h"
-#include "g2o/solvers/cholmod/linear_solver_cholmod.h"
-#include "g2o/solvers/dense/linear_solver_dense.h"
-#include "g2o/types/sba/types_six_dof_expmap.h"
-//#include "g2o/math_groups/se3quat.h"
-#include "g2o/solvers/structure_only/structure_only_solver.h"
+G2O_USE_OPTIMIZATION_LIBRARY(dense);
 
 using namespace Eigen;
 using namespace std;
 
-
 class Sample {
-public:
-  static int uniform(int from, int to);
-  static double uniform();
-  static double gaussian(double sigma);
+ public:
+  static int uniform(int from, int to) { return static_cast<int>(g2o::Sampler::uniformRand(from, to)); }
 };
-
-static double uniform_rand(double lowerBndr, double upperBndr){
-  return lowerBndr + ((double) std::rand() / (RAND_MAX + 1.0)) * (upperBndr - lowerBndr);
-}
-
-static double gauss_rand(double mean, double sigma){
-  double x, y, r2;
-  do {
-    x = -1.0 + 2.0 * uniform_rand(0.0, 1.0);
-    y = -1.0 + 2.0 * uniform_rand(0.0, 1.0);
-    r2 = x * x + y * y;
-  } while (r2 > 1.0 || r2 == 0.0);
-  return mean + sigma * y * std::sqrt(-2.0 * log(r2) / r2);
-}
-
-int Sample::uniform(int from, int to){
-  return static_cast<int>(uniform_rand(from, to));
-}
-
-double Sample::uniform(){
-  return uniform_rand(0., 1.);
-}
-
-double Sample::gaussian(double sigma){
-  return gauss_rand(0., sigma);
-}
 
 int main(int argc, const char* argv[]){
   if (argc<2)
@@ -127,33 +97,29 @@ int main(int argc, const char* argv[]){
   cout << "STRUCTURE_ONLY: " << STRUCTURE_ONLY<< endl;
   cout << "DENSE: "<<  DENSE << endl;
 
-
-
   g2o::SparseOptimizer optimizer;
   optimizer.setVerbose(false);
-  g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
+  string solverName = "lm_fix6_3";
   if (DENSE) {
-    linearSolver= new g2o::LinearSolverDense<g2o
-        ::BlockSolver_6_3::PoseMatrixType>();
+    solverName = "lm_dense6_3";
   } else {
-    linearSolver
-        = new g2o::LinearSolverCholmod<g2o
-        ::BlockSolver_6_3::PoseMatrixType>();
+#ifdef G2O_HAVE_CHOLMOD
+    solverName = "lm_fix6_3_cholmod";
+#else
+    solverName = "lm_fix6_3";
+#endif
   }
 
-
-  g2o::BlockSolver_6_3 * solver_ptr
-      = new g2o::BlockSolver_6_3(linearSolver);
-  g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-  optimizer.setAlgorithm(solver);
-
+  g2o::OptimizationAlgorithmProperty solverProperty;
+  optimizer.setAlgorithm(
+      g2o::OptimizationAlgorithmFactory::instance()->construct(solverName, solverProperty));
 
   vector<Vector3d> true_points;
   for (size_t i=0;i<500; ++i)
   {
-    true_points.push_back(Vector3d((Sample::uniform()-0.5)*3,
-                                   Sample::uniform()-0.5,
-                                   Sample::uniform()+3));
+    true_points.push_back(Vector3d((g2o::Sampler::uniformRand(0., 1.)-0.5)*3,
+                                   g2o::Sampler::uniformRand(0., 1.)-0.5,
+                                   g2o::Sampler::uniformRand(0., 1.)+3));
   }
 
   double focal_length= 1000.;
@@ -192,18 +158,18 @@ int main(int argc, const char* argv[]){
   double sum_diff2 = 0;
 
   cout << endl;
-  tr1::unordered_map<int,int> pointid_2_trueid;
-  tr1::unordered_set<int> inliers;
+  unordered_map<int,int> pointid_2_trueid;
+  unordered_set<int> inliers;
 
   for (size_t i=0; i<true_points.size(); ++i){
-    g2o::VertexSBAPointXYZ * v_p
-        = new g2o::VertexSBAPointXYZ();
+    g2o::VertexPointXYZ * v_p
+        = new g2o::VertexPointXYZ();
     v_p->setId(point_id);
     v_p->setMarginalized(true);
     v_p->setEstimate(true_points.at(i)
-                     + Vector3d(Sample::gaussian(1),
-                                Sample::gaussian(1),
-                                Sample::gaussian(1)));
+                     + Vector3d(g2o::Sampler::gaussRand(0., 1),
+                                g2o::Sampler::gaussRand(0., 1),
+                                g2o::Sampler::gaussRand(0., 1)));
     int num_obs = 0;
     for (size_t j=0; j<true_poses.size(); ++j){
       Vector2d z = cam_params->cam_map(true_poses.at(j).map(true_points.at(i)));
@@ -219,14 +185,14 @@ int main(int argc, const char* argv[]){
             = cam_params->cam_map(true_poses.at(j).map(true_points.at(i)));
 
         if (z[0]>=0 && z[1]>=0 && z[0]<640 && z[1]<480){
-          double sam = Sample::uniform();
+          double sam = g2o::Sampler::uniformRand(0., 1.);
           if (sam<OUTLIER_RATIO){
             z = Vector2d(Sample::uniform(0,640),
                          Sample::uniform(0,480));
             inlier= false;
           }
-          z += Vector2d(Sample::gaussian(PIXEL_NOISE),
-                        Sample::gaussian(PIXEL_NOISE));
+          z += Vector2d(g2o::Sampler::gaussRand(0., PIXEL_NOISE),
+                        g2o::Sampler::gaussRand(0., PIXEL_NOISE));
           g2o::EdgeProjectXYZ2UV * e
               = new g2o::EdgeProjectXYZ2UV();
           e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(v_p));
@@ -273,10 +239,10 @@ int main(int argc, const char* argv[]){
   cout << "Performing full BA:" << endl;
   optimizer.optimize(10);
   cout << endl;
-  cout << "Point error before optimisation (inliers only): " << sqrt(sum_diff2/point_num) << endl;
+  cout << "Point error before optimisation (inliers only): " << sqrt(sum_diff2/inliers.size()) << endl;
   point_num = 0;
   sum_diff2 = 0;
-  for (tr1::unordered_map<int,int>::iterator it=pointid_2_trueid.begin();
+  for (unordered_map<int,int>::iterator it=pointid_2_trueid.begin();
        it!=pointid_2_trueid.end(); ++it){
     g2o::HyperGraph::VertexIDMap::iterator v_it
         = optimizer.vertices().find(it->first);
@@ -284,8 +250,8 @@ int main(int argc, const char* argv[]){
       cerr << "Vertex " << it->first << " not in graph!" << endl;
       exit(-1);
     }
-    g2o::VertexSBAPointXYZ * v_p
-        = dynamic_cast< g2o::VertexSBAPointXYZ * > (v_it->second);
+    g2o::VertexPointXYZ * v_p
+        = dynamic_cast< g2o::VertexPointXYZ * > (v_it->second);
     if (v_p==0){
       cerr << "Vertex " << it->first << "is not a PointXYZ!" << endl;
       exit(-1);
@@ -296,6 +262,6 @@ int main(int argc, const char* argv[]){
     sum_diff2 += diff.dot(diff);
     ++point_num;
   }
-  cout << "Point error after optimisation (inliers only): " << sqrt(sum_diff2/point_num) << endl;
+  cout << "Point error after optimisation (inliers only): " << sqrt(sum_diff2/inliers.size()) << endl;
   cout << endl;
 }

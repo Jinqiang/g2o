@@ -34,19 +34,15 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Cholesky>
-#include <Eigen/StdVector>
 #include <stack>
 
 namespace g2o {
-
-  using namespace Eigen;
-
-
-/**
+#define G2O_VERTEX_DIM ((D == Eigen::Dynamic) ? _dimension : D)
+  /**
  * \brief Templatized BaseVertex
  *
  * Templatized BaseVertex
- * D  : minimal dimension of the vertex, e.g., 3 for rotation in 3D
+ * D  : minimal dimension of the vertex, e.g., 3 for rotation in 3D. -1 means dynamically assigned at runtime.
  * T  : internal type to represent the estimate, e.g., Quaternion for rotation in 3D
  */
   template <int D, typename T>
@@ -59,36 +55,38 @@ namespace g2o {
 
     static const int Dimension = D;           ///< dimension of the estimate (minimal) in the manifold space
 
-    typedef Map<Matrix<double, D, D>, Matrix<double,D,D>::Flags & AlignedBit ? Aligned : Unaligned >  HessianBlockType;
+    typedef Eigen::Map<Eigen::Matrix<number_t, D, D, Eigen::ColMajor>, Eigen::Matrix<number_t, D, D, Eigen::ColMajor>::Flags & Eigen::PacketAccessBit ? Eigen::Aligned : Eigen::Unaligned >  HessianBlockType;
 
   public:
     BaseVertex();
 
-    virtual const double& hessian(int i, int j) const { assert(i<D && j<D); return _hessian(i,j);}
-    virtual double& hessian(int i, int j)  { assert(i<D && j<D); return _hessian(i,j);}
-    virtual double hessianDeterminant() const {return _hessian.determinant();}
-    virtual double* hessianData() { return const_cast<double*>(_hessian.data());}
+    virtual const number_t& hessian(int i, int j) const { assert(i<G2O_VERTEX_DIM && j<G2O_VERTEX_DIM); return _hessian(i,j);}
+    virtual number_t& hessian(int i, int j)  { assert(i<G2O_VERTEX_DIM && j<G2O_VERTEX_DIM); return _hessian(i,j);}
+    virtual number_t hessianDeterminant() const {return _hessian.determinant();}
+    virtual number_t* hessianData() { return const_cast<number_t*>(_hessian.data());}
 
-    virtual void mapHessianMemory(double* d);
+    inline virtual void mapHessianMemory(number_t* d);
 
-    virtual int copyB(double* b_) const {
-      memcpy(b_, _b.data(), Dimension * sizeof(double));
-      return Dimension; 
+
+    virtual int copyB(number_t* b_) const {
+      const int vertexDim = G2O_VERTEX_DIM;
+      memcpy(b_, _b.data(), vertexDim * sizeof(number_t));
+      return vertexDim; 
     }
 
-    virtual const double& b(int i) const { assert(i < D); return _b(i);}
-    virtual double& b(int i) { assert(i < D); return _b(i);}
-    virtual double* bData() { return _b.data();}
+    virtual const number_t& b(int i) const { assert(i < D); return _b(i);}
+    virtual number_t& b(int i) { assert(i < G2O_VERTEX_DIM); return _b(i);}
+    virtual number_t* bData() { return _b.data();}
 
-    virtual void clearQuadraticForm();
+    inline virtual void clearQuadraticForm();
 
     //! updates the current vertex with the direct solution x += H_ii\b_ii
     //! @returns the determinant of the inverted hessian
-    virtual double solveDirect(double lambda=0);
+    inline virtual number_t solveDirect(number_t lambda=0);
 
     //! return right hand side b of the constructed linear system
-    Matrix<double, D, 1>& b() { return _b;}
-    const Matrix<double, D, 1>& b() const { return _b;}
+    Eigen::Matrix<number_t, D, 1, Eigen::ColMajor>& b() { return _b;}
+    const Eigen::Matrix<number_t, D, 1, Eigen::ColMajor>& b() const { return _b;}
     //! return the hessian block associated with the vertex
     HessianBlockType& A() { return _hessian;}
     const HessianBlockType& A() const { return _hessian;}
@@ -102,10 +100,10 @@ namespace g2o {
     const EstimateType& estimate() const { return _estimate;}
     //! set the estimate for the vertex also calls updateCache()
     void setEstimate(const EstimateType& et) { _estimate = et; updateCache();}
-
+    
   protected:
     HessianBlockType _hessian;
-    Matrix<double, D, 1> _b;
+    Eigen::Matrix<number_t, D, 1, Eigen::ColMajor> _b;
     EstimateType _estimate;
     BackupStackType _backup;
   public:
@@ -113,6 +111,8 @@ namespace g2o {
 };
 
 #include "base_vertex.hpp"
+
+#undef G2O_VERTEX_DIM
 
 } // end namespace g2o
 

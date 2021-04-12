@@ -2,17 +2,17 @@
 // Copyright (C) 2011 R. Kuemmerle, G. Grisetti, W. Burgard
 //
 // This file is part of g2o.
-// 
+//
 // g2o is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // g2o is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with g2o.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -20,6 +20,21 @@
 #include "g2o/stuff/opengl_primitives.h"
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/hyper_graph_action.h"
+
+// some macro helpers for identifying the version number of QGLViewer
+// QGLViewer changed some parts of its API in version 2.6.
+// The following preprocessor hack accounts for this. THIS SUCKS!!!
+#if (((QGLVIEWER_VERSION & 0xff0000) >> 16) >= 2 && ((QGLVIEWER_VERSION & 0x00ff00) >> 8) >= 6)
+#define qglv_real qreal
+#else
+#define qglv_real float
+#endif
+
+// Again, some API changes in QGLViewer which produce annoying text in the console
+// if the old API is used.
+#if (((QGLVIEWER_VERSION & 0xff0000) >> 16) >= 2 && ((QGLVIEWER_VERSION & 0x00ff00) >> 8) >= 5)
+#define QGLVIEWER_DEPRECATED_MOUSEBINDING
+#endif
 
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
@@ -43,18 +58,18 @@ namespace {
     public:
       StandardCamera() : _standard(true) {};
 
-      float zNear() const {
-        if (_standard) 
-          return 0.001f; 
-        else 
-          return Camera::zNear(); 
+      qglv_real zNear() const {
+        if (_standard)
+          return qglv_real(0.001);
+        else
+          return Camera::zNear();
       }
 
-      float zFar() const
-      {  
-        if (_standard) 
-          return 10000.0f; 
-        else 
+      qglv_real zFar() const
+      {
+        if (_standard)
+          return qglv_real(10000.0);
+        else
           return Camera::zFar();
       }
 
@@ -67,9 +82,9 @@ namespace {
 
 } // end anonymous namespace
 
-G2oQGLViewer::G2oQGLViewer(QWidget* parent, const QGLWidget* shareWidget, Qt::WFlags flags) :
+G2oQGLViewer::G2oQGLViewer(QWidget* parent, const QGLWidget* shareWidget, Qt::WindowFlags flags) :
   QGLViewer(parent, shareWidget, flags),
-  graph(0), _drawActions(0), _drawList(0)
+  graph(0), _drawActions(0), _drawList(0), _updateDisplay(true)
 {
   setAxisIsDrawn(false);
   _drawActionParameters = new DrawAction::Parameters();
@@ -90,7 +105,7 @@ void G2oQGLViewer::draw()
     _drawActions = HyperGraphActionLibrary::instance()->actionByName("draw");
     assert(_drawActions);
   }
-  
+
   if (! _drawActions) // avoid segmentation fault in release build
     return;
   if (_updateDisplay) {
@@ -99,7 +114,7 @@ void G2oQGLViewer::draw()
     applyAction(graph, _drawActions, _drawActionParameters);
     glEndList();
   } else {
-    glCallList(_drawList); 
+    glCallList(_drawList);
   }
 }
 
@@ -113,7 +128,7 @@ void G2oQGLViewer::init()
 
   // some default settings i like
   glEnable(GL_LINE_SMOOTH);
-  glEnable(GL_BLEND); 
+  glEnable(GL_BLEND);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_NORMALIZE);
   //glEnable(GL_CULL_FACE);
@@ -124,11 +139,16 @@ void G2oQGLViewer::init()
   setAxisIsDrawn();
 
   // don't save state
-  setStateFileName(QString::null);
+  setStateFileName(QString());
 
   // mouse bindings
-  setMouseBinding(Qt::RightButton, CAMERA, ZOOM);
+#ifdef QGLVIEWER_DEPRECATED_MOUSEBINDING
+  setMouseBinding(Qt::NoModifier, Qt::RightButton, CAMERA, TRANSLATE);
+  setMouseBinding(Qt::NoModifier, Qt::MidButton, CAMERA, TRANSLATE);
+#else
+  setMouseBinding(Qt::RightButton, CAMERA, TRANSLATE);
   setMouseBinding(Qt::MidButton, CAMERA, TRANSLATE);
+#endif
 
   // keyboard shortcuts
   setShortcut(CAMERA_MODE, 0);

@@ -28,11 +28,11 @@
 #define JACOBIAN_WORKSPACE_H
 
 #include <Eigen/Core>
-#include <Eigen/StdVector>
 
 #include <vector>
 #include <cassert>
 
+#include "g2o/config.h"
 #include "g2o_core_api.h"
 #include "hyper_graph.h"
 
@@ -47,11 +47,14 @@ namespace g2o {
    * for computing the Jacobian of the error functions.
    * Before calling linearizeOplus on an edge, the workspace needs to be allocated
    * by calling allocate().
+   *
+   * By default, the sizes are updated incrementally with each call. If the reset flag is set to true,
+   * the counts are set back to
    */
   class G2O_CORE_API JacobianWorkspace
   {
     public:
-      typedef std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd> >      WorkspaceVector;
+      typedef std::vector<VectorX, Eigen::aligned_allocator<VectorX> >      WorkspaceVector;
 
     public:
       JacobianWorkspace();
@@ -65,22 +68,27 @@ namespace g2o {
       /**
        * update the maximum required workspace needed by taking into account this edge
        */
-      void updateSize(const HyperGraph::Edge* e);
+      void updateSize(const HyperGraph::Edge* e, bool reset = false);
 
       /**
        * update the required workspace by looking at a full graph
        */
-      void updateSize(const OptimizableGraph& graph);
+      void updateSize(const OptimizableGraph& graph, bool reset = false);
 
       /**
        * manually update with the given parameters
        */
-      void updateSize(int numVertices, int dimension);
+      void updateSize(int numVertices, int dimension, bool reset = false);
+
+      /**
+       * set the full workspace to zero
+       */
+      void setZero();
 
       /**
        * return the workspace for a vertex in an edge
        */
-      double* workspaceForVertex(int vertexIndex)
+      number_t* workspaceForVertex(int vertexIndex)
       {
         assert(vertexIndex >= 0 && (size_t)vertexIndex < _workspace.size() && "Index out of bounds");
         return _workspace[vertexIndex].data();

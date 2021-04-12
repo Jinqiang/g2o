@@ -40,7 +40,7 @@
 #include "g2o/core/factory.h"
 #include "g2o/core/optimization_algorithm_factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
-#include "g2o/solvers/csparse/linear_solver_csparse.h"
+#include "g2o/solvers/eigen/linear_solver_eigen.h"
 
 using namespace std;
 using namespace g2o;
@@ -48,8 +48,6 @@ using namespace g2o::tutorial;
 
 int main()
 {
-  init_tutorial_slam2d_types();
-
   // TODO simulate different sensor offset
   // simulate a robot observing landmarks while travelling on a grid
   SE2 sensorOffsetTransf(0.2, 0.1, -0.1);
@@ -62,14 +60,14 @@ int main()
    ********************************************************************************/
 
   typedef BlockSolver< BlockSolverTraits<-1, -1> >  SlamBlockSolver;
-  typedef LinearSolverCSparse<SlamBlockSolver::PoseMatrixType> SlamLinearSolver;
+  typedef LinearSolverEigen<SlamBlockSolver::PoseMatrixType> SlamLinearSolver;
 
   // allocating the optimizer
   SparseOptimizer optimizer;
-  SlamLinearSolver* linearSolver = new SlamLinearSolver();
+  auto linearSolver = g2o::make_unique<SlamLinearSolver>();
   linearSolver->setBlockOrdering(false);
-  SlamBlockSolver* blockSolver = new SlamBlockSolver(linearSolver);
-  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(blockSolver);
+  OptimizationAlgorithmGaussNewton* solver = new OptimizationAlgorithmGaussNewton(
+    g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)));
 
   optimizer.setAlgorithm(solver);
 
@@ -84,7 +82,7 @@ int main()
   cerr << "Optimization: Adding robot poses ... ";
   for (size_t i = 0; i < simulator.poses().size(); ++i) {
     const Simulator::GridPose& p = simulator.poses()[i];
-    const SE2& t = p.simulatorPose; 
+    const SE2& t = p.simulatorPose;
     VertexSE2* robot =  new VertexSE2;
     robot->setId(p.id);
     robot->setEstimate(t);
@@ -153,11 +151,6 @@ int main()
 
   // freeing the graph memory
   optimizer.clear();
-
-  // destroy all the singletons
-  Factory::destroy();
-  OptimizationAlgorithmFactory::destroy();
-  HyperGraphActionLibrary::destroy();
 
   return 0;
 }

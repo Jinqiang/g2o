@@ -34,8 +34,6 @@
 
 namespace g2o {
   
-  using namespace Eigen;
-
   class G2O_INTERACTIVE_API OnlineVertexSE3 : public VertexSE3
   {
     public:
@@ -50,8 +48,8 @@ namespace g2o {
 
       void oplusUpdatedEstimate(double* update)
       {
-        Map<const Vector6d> v(update);
-        Eigen::Isometry3d increment = internal::fromVectorMQT(v);
+        Eigen::Map<const Vector6> v(update);
+        Isometry3 increment = internal::fromVectorMQT(v);
         updatedEstimate = _estimate * increment;
       }
 
@@ -82,7 +80,7 @@ namespace g2o {
         OnlineVertexSE3 *from = static_cast<OnlineVertexSE3*>(_vertices[0]);
         OnlineVertexSE3 *to   = static_cast<OnlineVertexSE3*>(_vertices[1]);
         Eigen::Isometry3d delta = _inverseMeasurement * from->estimate().inverse() * to->estimate();
-        Vector6d error = internal::toVectorMQT(delta);
+        Vector6 error = internal::toVectorMQT(delta);
         return error.dot(information() * error);
       }
   };

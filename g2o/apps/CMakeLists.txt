@@ -1,10 +1,14 @@
-ADD_SUBDIRECTORY(g2o_cli)
-ADD_SUBDIRECTORY(g2o_simulator)
+add_subdirectory(g2o_cli)
+add_subdirectory(g2o_hierarchical)
 
-IF(QT4_FOUND AND QGLVIEWER_FOUND)
-  ADD_SUBDIRECTORY(g2o_viewer)
-ENDIF(QT4_FOUND AND QGLVIEWER_FOUND)
+if (G2O_HAVE_OPENGL)
+  add_subdirectory(g2o_simulator)
+endif()
 
-IF(G2O_BUILD_LINKED_APPS)
-  ADD_SUBDIRECTORY(linked_binaries)
-ENDIF()
+if(QGLVIEWER_FOUND AND Qt5_FOUND)
+  add_subdirectory(g2o_viewer)
+endif()
+
+if(G2O_BUILD_LINKED_APPS)
+  add_subdirectory(linked_binaries)
+endif()

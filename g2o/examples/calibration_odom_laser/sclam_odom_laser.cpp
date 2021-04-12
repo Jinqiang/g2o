@@ -50,6 +50,7 @@
 
 using namespace std;
 using namespace g2o;
+using namespace Eigen;
 
 static bool hasToStop = false;
 
@@ -197,7 +198,7 @@ int main(int argc, char** argv)
 
       ofstream rawStream("odometry_raw.txt");
       ofstream calibratedStream("odometry_calibrated.txt");
-      const Vector3d& odomCalib = odomParamsVertex->estimate();
+      const Vector3d& odomCalib = odomParamsVertex ? odomParamsVertex->estimate() : Vector3d::Ones();
       RobotLaser* prev = dynamic_cast<RobotLaser*>(testRobotLaserQueue.buffer().begin()->second);
       SE2 prevCalibratedPose = prev->odomPose();
 

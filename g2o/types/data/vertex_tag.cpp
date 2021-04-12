@@ -31,7 +31,7 @@
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_wrapper.h"
 #include "g2o/stuff/opengl_primitives.h"
-#include "EXTERNAL/freeglut/freeglut_minimal.h"
+#include "g2o/EXTERNAL/freeglut/freeglut_minimal.h"
 #endif
 
 #include <iomanip>
@@ -70,8 +70,7 @@ namespace g2o {
 
 
 #ifdef G2O_HAVE_OPENGL
-  VertexTagDrawAction::VertexTagDrawAction(): DrawAction(typeid(VertexTag).name()){
-  }
+  VertexTagDrawAction::VertexTagDrawAction() : DrawAction(typeid(VertexTag).name()), _textSize(nullptr) {}
 
   bool VertexTagDrawAction::refreshPropertyPtrs(HyperGraphElementAction::Parameters* params_){
     if (!DrawAction::refreshPropertyPtrs(params_))
@@ -84,10 +83,10 @@ namespace g2o {
     return true;
   }
 
-  HyperGraphElementAction* VertexTagDrawAction::operator()(HyperGraph::HyperGraphElement* element, 
+  HyperGraphElementAction* VertexTagDrawAction::operator()(HyperGraph::HyperGraphElement* element,
                  HyperGraphElementAction::Parameters* params_){
     if (typeid(*element).name()!=_typeName)
-      return 0;
+      return nullptr;
 
     refreshPropertyPtrs(params_);
     if (! _previousParams){
