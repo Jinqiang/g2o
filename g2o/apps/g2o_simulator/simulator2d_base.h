@@ -28,16 +28,19 @@
 #define G2O_SIMULATOR2D_BASE_H_
 
 #include "g2o/types/slam2d/types_slam2d.h"
+#include "g2o/types/slam2d_addons/types_slam2d_addons.h"
 #include "simulator.h"
 
 namespace g2o {
 
-  typedef WorldObject<VertexSE2> WorldObjectSE2;
+typedef WorldObject<VertexSE2> WorldObjectSE2;
 
-  typedef WorldObject<VertexPointXY> WorldObjectPointXY;
+typedef WorldObject<VertexPointXY> WorldObjectPointXY;
 
-  typedef Robot<WorldObjectSE2>  Robot2D;
+typedef WorldObject<VertexSegment2D> WorldObjectSegment2D;
 
-}
+typedef Robot<WorldObjectSE2> Robot2D;
+
+}  // namespace g2o
 
 #endif

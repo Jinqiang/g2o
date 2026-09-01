@@ -1,25 +1,58 @@
-ADD_SUBDIRECTORY(data_fitting)
+# Self-contained examples which declare their own types
+add_subdirectory(data_fitting)
+add_subdirectory(dynamic_vertex)
+add_subdirectory(bal)
+add_subdirectory(logging)
+add_subdirectory(target)
+add_subdirectory(tutorial_slam2d)
 
-ADD_SUBDIRECTORY(tutorial_slam2d)
-ADD_SUBDIRECTORY(sphere)
+# 2D SLAM examples
 
-# The condition on cholmod is required here because the cholmod solver
-# is explicitly used in these examples.
-IF(CHOLMOD_FOUND)
-  ADD_SUBDIRECTORY(target)
-  ADD_SUBDIRECTORY(ba)
-  ADD_SUBDIRECTORY(ba_anchored_inverse_depth)
-ENDIF(CHOLMOD_FOUND)
+if(G2O_BUILD_SCLAM2D_TYPES AND G2O_BUILD_DATA_TYPES)
+  add_subdirectory(calibration_odom_laser)
+endif()
 
-ADD_SUBDIRECTORY(icp)
-ADD_SUBDIRECTORY(sba)
-ADD_SUBDIRECTORY(bal)
+# 3D examples
+if(G2O_BUILD_SBA_TYPES)
+  add_subdirectory(ba)
+  add_subdirectory(ba_anchored_inverse_depth)
+  add_subdirectory(data_convert)
+endif()
 
-IF(QT4_FOUND AND QGLVIEWER_FOUND)
-  ADD_SUBDIRECTORY(slam2d)
-ENDIF(QT4_FOUND AND QGLVIEWER_FOUND)
+if (G2O_BUILD_ICP_TYPES)
+  add_subdirectory(icp)
+  add_subdirectory(sba)
+endif()
 
-ADD_SUBDIRECTORY(calibration_odom_laser)
-ADD_SUBDIRECTORY(data_convert)
-ADD_SUBDIRECTORY(interactive_slam)
-ADD_SUBDIRECTORY(simple_optimize)
+if (G2O_BUILD_SLAM3D_ADDON_TYPES)
+  add_subdirectory(line_slam)
+  add_subdirectory(plane_slam)
+endif()
+
+if (G2O_BUILD_SIM3_TYPES)
+  add_subdirectory(sim3)
+endif()
+
+# slam 3d
+if (G2O_BUILD_SLAM3D_TYPES)
+  add_subdirectory(sphere)
+endif()
+
+if(G2O_BUILD_SLAM2D_TYPES AND G2O_BUILD_SLAM3D_TYPES)
+  add_subdirectory(anonymize_observations)
+  add_subdirectory(interactive_slam)
+  add_subdirectory(simple_optimize)
+endif()
+
+if(G2O_BUILD_SLAM2D_TYPES AND G2O_BUILD_SLAM2D_ADDON_TYPES AND G2O_BUILD_SLAM3D_TYPES)
+  add_subdirectory(convert_segment_line)
+endif()
+
+if(Qt5_FOUND AND QGLVIEWER_FOUND AND G2O_HAVE_OPENGL)
+  add_subdirectory(slam2d)
+endif()
+
+# complex example of hierarchical optimization
+if (G2O_BUILD_SLAM3D_TYPES)
+  add_subdirectory(g2o_hierarchical)
+endif()

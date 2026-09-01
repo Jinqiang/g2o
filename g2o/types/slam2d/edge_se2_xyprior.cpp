@@ -28,38 +28,19 @@
 
 namespace g2o {
 
-  EdgeSE2XYPrior::EdgeSE2XYPrior() : BaseUnaryEdge< 2, Eigen::Vector2d, g2o::VertexSE2 >()
-  {
-    
-  }
+EdgeSE2XYPrior::EdgeSE2XYPrior()
+    : BaseUnaryEdge<2, Vector2, g2o::VertexSE2>() {}
 
-  bool EdgeSE2XYPrior::read(std::istream& is)
-  {
-    Vector2d p;
-    is >> p[0] >> p[1];
-    setMeasurement(p);    
-    for (int i = 0; i < 2; ++i)
-      for (int j = i; j < 2; ++j) {
-        is >> information()(i, j);
-        if (i != j)
-          information()(j, i) = information()(i, j);
-      }
-    return true;
-  }
+bool EdgeSE2XYPrior::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
+  return readInformationMatrix(is);
+}
 
-  bool EdgeSE2XYPrior::write(std::ostream& os) const
-  {
-    Vector2d p = measurement();
-    os << p[0] << " " << p[1];
-    for (int i = 0; i < 2; ++i)
-      for (int j = i; j < 2; ++j)
-        os << " " << information()(i, j);
-    return os.good();
-  }
+bool EdgeSE2XYPrior::write(std::ostream& os) const {
+  internal::writeVector(os, measurement());
+  return writeInformationMatrix(os);
+}
 
-  void EdgeSE2XYPrior::linearizeOplus()
-  {
-    _jacobianOplusXi << 1,0,0, 0,1,0;
-  }
+void EdgeSE2XYPrior::linearizeOplus() { _jacobianOplusXi << 1, 0, 0, 0, 1, 0; }
 
-} // end namespace
+}  // namespace g2o

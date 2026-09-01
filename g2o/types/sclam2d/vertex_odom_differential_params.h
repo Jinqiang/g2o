@@ -27,28 +27,51 @@
 #ifndef G2O_VERTEX_ODOM_DIFFERENTIAL_PARAMS_H
 #define G2O_VERTEX_ODOM_DIFFERENTIAL_PARAMS_H
 
-#include "g2o_types_sclam2d_api.h"
 #include "g2o/core/base_vertex.h"
+#include "g2o_types_sclam2d_api.h"
 
 namespace g2o {
 
-  class G2O_TYPES_SCLAM2D_API VertexOdomDifferentialParams: public BaseVertex <3, Vector3d> {
-    public:
-      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-      VertexOdomDifferentialParams();
-      virtual void setToOriginImpl() {
-        _estimate << 1. , 1., 1.;
-      }
+class G2O_TYPES_SCLAM2D_API VertexOdomDifferentialParams
+    : public BaseVertex<3, Vector3> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  VertexOdomDifferentialParams();
+  virtual void setToOriginImpl() { _estimate << 1., 1., 1.; }
 
-      virtual void oplusImpl(const double* v) {
-        for (int i=0; i<3; i++)
-          _estimate(i) += v[i];
-      }
+  virtual void oplusImpl(const double* v) {
+    for (int i = 0; i < 3; i++) _estimate(i) += v[i];
+  }
 
-      virtual bool read(std::istream& is);
-      virtual bool write(std::ostream& os) const;
-  };
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-}
+  // Estimate API: 3-D Vector3 passthrough; storage and tangent dim coincide.
+  virtual bool setEstimateDataImpl(const double* est) {
+    Eigen::Map<const Vector3> v(est);
+    _estimate = v;
+    return true;
+  }
+
+  virtual bool getEstimateData(double* est) const {
+    Eigen::Map<Vector3> v(est);
+    v = _estimate;
+    return true;
+  }
+
+  virtual int estimateDimension() const { return 3; }
+
+  virtual bool setMinimalEstimateDataImpl(const double* est) {
+    return setEstimateDataImpl(est);
+  }
+
+  virtual bool getMinimalEstimateData(double* est) const {
+    return getEstimateData(est);
+  }
+
+  virtual int minimalEstimateDimension() const { return 3; }
+};
+
+}  // namespace g2o
 
 #endif

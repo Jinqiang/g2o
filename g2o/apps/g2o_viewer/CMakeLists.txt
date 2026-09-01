@@ -1,11 +1,12 @@
-INCLUDE(${QT_USE_FILE})
+# Qt5 was been find_package'd() by FindQGLViewer.cmake
+if(Qt5_FOUND)
+  QT5_WRAP_UI(UI_HEADERS base_main_window.ui base_properties_widget.ui)
+  QT5_WRAP_CPP(UI_SOURCES main_window.h properties_widget.h)
+endif()
 
-QT4_WRAP_UI(UI_HEADERS base_main_window.ui base_properties_widget.ui)
-QT4_WRAP_CPP(UI_SOURCES main_window.h properties_widget.h)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-INCLUDE_DIRECTORIES(${QGLVIEWER_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${QT_INCLUDES})
-
-ADD_LIBRARY(viewer_library ${G2O_LIB_TYPE}
+add_library(viewer_library ${G2O_LIB_TYPE}
   g2o_viewer_api.h
   g2o_qglviewer.cpp g2o_qglviewer.h
   main_window.cpp main_window.h
@@ -16,24 +17,35 @@ ADD_LIBRARY(viewer_library ${G2O_LIB_TYPE}
   run_g2o_viewer.cpp run_g2o_viewer.h
   ${UI_HEADERS} ${UI_SOURCES}
 )
-SET_TARGET_PROPERTIES(viewer_library PROPERTIES OUTPUT_NAME ${LIB_PREFIX}viewer)
+set_target_properties(viewer_library PROPERTIES OUTPUT_NAME ${LIB_PREFIX}viewer)
+set_target_properties(viewer_library PROPERTIES
+  VERSION ${G2O_LIB_VERSION}
+  SOVERSION ${G2O_LIB_SOVERSION})
+if (APPLE)
+  set_target_properties(viewer_library PROPERTIES INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+endif()
 
-ADD_EXECUTABLE(g2o_viewer
+add_executable(g2o_viewer
   g2o_viewer.cpp
 )
 
-SET_TARGET_PROPERTIES(g2o_viewer PROPERTIES OUTPUT_NAME g2o_viewer${EXE_POSTFIX})
+set_target_properties(g2o_viewer PROPERTIES OUTPUT_NAME g2o_viewer)
 
-TARGET_LINK_LIBRARIES(viewer_library core g2o_cli_library ${QGLVIEWER_LIBRARY} ${QT_LIBRARIES})
-TARGET_LINK_LIBRARIES(viewer_library core opengl_helper)
-TARGET_LINK_LIBRARIES(g2o_viewer viewer_library)
+target_link_libraries(viewer_library core g2o_cli_library QGLViewer::QGLViewer)
+target_link_libraries(viewer_library core opengl_helper)
+target_link_libraries(g2o_viewer viewer_library)
 
-INSTALL(TARGETS g2o_viewer viewer_library
-  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+install(TARGETS viewer_library
+  EXPORT ${G2O_TARGETS_EXPORT_NAME}
+  RUNTIME DESTINATION ${RUNTIME_DESTINATION}
+  LIBRARY DESTINATION ${LIBRARY_DESTINATION}
+  ARCHIVE DESTINATION ${ARCHIVE_DESTINATION}
+  INCLUDES DESTINATION ${INCLUDES_DESTINATION} ${qt5_includes_dirs} ${QGLVIEWER_INCLUDE_DIR}
+)
+install(TARGETS g2o_viewer
+  RUNTIME DESTINATION ${RUNTIME_DESTINATION}
 )
 
-FILE(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
-INSTALL(FILES ${headers} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/g2o/apps/g2o_viewer)
-INSTALL(FILES ${UI_HEADERS} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/g2o/apps/g2o_viewer)
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
+install(FILES ${headers} DESTINATION ${INCLUDES_INSTALL_DIR}/apps/g2o_viewer)
+install(FILES ${UI_HEADERS} DESTINATION ${INCLUDES_INSTALL_DIR}/apps/g2o_viewer)

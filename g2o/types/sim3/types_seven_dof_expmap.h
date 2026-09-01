@@ -26,116 +26,238 @@
 
 #ifndef G2O_SEVEN_DOF_EXPMAP_TYPES
 #define G2O_SEVEN_DOF_EXPMAP_TYPES
-
-#include "g2o/core/base_vertex.h"
+#include "g2o/config.h"
 #include "g2o/core/base_binary_edge.h"
+#include "g2o/core/base_vertex.h"
 #include "g2o/types/sba/types_six_dof_expmap.h"
 #include "sim3.h"
 
+#ifdef _MSC_VER
+// We are using a Microsoft compiler:
+#ifdef G2O_SHARED_LIBS
+#ifdef types_sim3_EXPORTS
+#define G2O_TYPES_SIM3_API __declspec(dllexport)
+#else
+#define G2O_TYPES_SIM3_API __declspec(dllimport)
+#endif
+#else
+#define G2O_TYPES_SIM3_API
+#endif
+
+#else
+// Not Microsoft compiler so set empty definition:
+#define G2O_TYPES_SIM3_API
+#endif
 namespace g2o {
 
-  using namespace Eigen;
+#ifdef _MSC_VER
+// explicit instantiation of BaseVertex, if not instantiated causes already
+// defined error in some cases (msvc debug only) see links below
+// https://stackoverflow.com/questions/44960760/msvc-dll-exporting-class-that-inherits-from-template-cause-lnk2005-already-defin
+// https://developercommunity.visualstudio.com/content/problem/224597/linker-failing-because-of-multiple-definitions-of.html
+template class BaseVertex<7, Sim3>;
+#endif
 
-  /**
+/**
  * \brief Sim3 Vertex, (x,y,z,qw,qx,qy,qz)
  * the parameterization for the increments constructed is a 7d vector
  * (x,y,z,qx,qy,qz) (note that we leave out the w part of the quaternion.
+ *
+ * Will represent relative transformation between two cameras
  */
-  class VertexSim3Expmap : public BaseVertex<7, Sim3>
-  {
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    VertexSim3Expmap();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+class G2O_TYPES_SIM3_API VertexSim3Expmap : public BaseVertex<7, Sim3> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  VertexSim3Expmap();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    virtual void setToOriginImpl() {
-      _estimate = Sim3();
-    }
+  virtual void setToOriginImpl() { _estimate = Sim3(); }
 
-    virtual void oplusImpl(const double* update_)
-    {
-      Map<Vector7d> update(const_cast<double*>(update_));
+  virtual void oplusImpl(const double* update_) {
+    Eigen::Map<Vector7> update(const_cast<double*>(update_));
 
-      if (_fix_scale)
-        update[6] = 0;
+    if (_fix_scale) update[6] = 0;
 
-      Sim3 s(update);
-      setEstimate(s*estimate());
-    }
+    Sim3 s(update);
+    setEstimate(s * estimate());
+  }
 
-    Vector2d _principle_point;
-    Vector2d _focal_length;
+  // Estimate API: 7-D Sim3 tangent (omega, upsilon, sigma) via Sim3::log().
+  // Storage and tangent dim coincide (no separate minimal representation).
+  virtual bool setEstimateDataImpl(const double* est) {
+    Eigen::Map<const Vector7> v(est);
+    setEstimate(Sim3(v));
+    return true;
+  }
 
-    Vector2d cam_map(const Vector2d & v) const
-    {
-      Vector2d res;
-      res[0] = v[0]*_focal_length[0] + _principle_point[0];
-      res[1] = v[1]*_focal_length[1] + _principle_point[1];
-      return res;
-    }
+  virtual bool getEstimateData(double* est) const {
+    Eigen::Map<Vector7> v(est);
+    v = estimate().log();
+    return true;
+  }
 
-    bool _fix_scale;
+  virtual int estimateDimension() const { return 7; }
 
+  virtual bool setMinimalEstimateDataImpl(const double* est) {
+    return setEstimateDataImpl(est);
+  }
 
-  protected:
-  };
+  virtual bool getMinimalEstimateData(double* est) const {
+    return getEstimateData(est);
+  }
 
-  /**
- * \brief 7D edge between two Vertex7
- */
-  class EdgeSim3 : public BaseBinaryEdge<7, Sim3, VertexSim3Expmap, VertexSim3Expmap>
-  {
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeSim3();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
-    void computeError()
-    {
-      const VertexSim3Expmap* v1 = static_cast<const VertexSim3Expmap*>(_vertices[0]);
-      const VertexSim3Expmap* v2 = static_cast<const VertexSim3Expmap*>(_vertices[1]);
+  virtual int minimalEstimateDimension() const { return 7; }
 
-      Sim3 C(_measurement);
-      Sim3 error_=C*v1->estimate()*v2->estimate().inverse();
-      _error = error_.log();
-    }
+  Vector2 _principle_point1, _principle_point2;
+  Vector2 _focal_length1, _focal_length2;
 
-    virtual double initialEstimatePossible(const OptimizableGraph::VertexSet& , OptimizableGraph::Vertex* ) { return 1.;}
-    virtual void initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* /*to*/)
-    {
-      VertexSim3Expmap* v1 = static_cast<VertexSim3Expmap*>(_vertices[0]);
-      VertexSim3Expmap* v2 = static_cast<VertexSim3Expmap*>(_vertices[1]);
-      if (from.count(v1) > 0)
-  v2->setEstimate(measurement()*v1->estimate());
-      else
-  v1->setEstimate(measurement().inverse()*v2->estimate());
-    }
-  };
+  Vector2 cam_map1(const Vector2& v) const {
+    Vector2 res;
+    res[0] = v[0] * _focal_length1[0] + _principle_point1[0];
+    res[1] = v[1] * _focal_length1[1] + _principle_point1[1];
+    return res;
+  }
 
+  Vector2 cam_map2(const Vector2& v) const {
+    Vector2 res;
+    res[0] = v[0] * _focal_length2[0] + _principle_point2[0];
+    res[1] = v[1] * _focal_length2[1] + _principle_point2[1];
+    return res;
+  }
 
-/**/
-class EdgeSim3ProjectXYZ : public  BaseBinaryEdge<2, Vector2d,  VertexSBAPointXYZ, VertexSim3Expmap>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeSim3ProjectXYZ();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+  bool _fix_scale;
 
-    void computeError()
-    {
-      const VertexSim3Expmap* v1 = static_cast<const VertexSim3Expmap*>(_vertices[1]);
-      const VertexSBAPointXYZ* v2 = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-
-      Vector2d obs(_measurement);
-      _error = obs-v1->cam_map(project(v1->estimate().map(v2->estimate())));
-    }
-
-   // virtual void linearizeOplus();
-
+ protected:
 };
 
-} // end namespace
+/**
+ * \brief 7D edge between two Vertex7
+ */
+class G2O_TYPES_SIM3_API EdgeSim3
+    : public BaseBinaryEdge<7, Sim3, VertexSim3Expmap, VertexSim3Expmap> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSim3();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+
+  // Measurement is Sim3, exposed as the 7-D Lie tangent (omega, upsilon, sigma)
+  // via Sim3::log(). Round-trip through Sim3(Vector7).
+  virtual bool setMeasurementData(const double* m) {
+    Eigen::Map<const Vector7> v(m);
+    setMeasurement(Sim3(v));
+    return true;
+  }
+
+  virtual bool getMeasurementData(double* m) const {
+    Eigen::Map<Vector7> v(m);
+    v = measurement().log();
+    return true;
+  }
+
+  virtual int measurementDimension() const { return 7; }
+
+  void computeError() {
+    const VertexSim3Expmap* v1 =
+        static_cast<const VertexSim3Expmap*>(_vertices[0]);
+    const VertexSim3Expmap* v2 =
+        static_cast<const VertexSim3Expmap*>(_vertices[1]);
+
+    Sim3 C(_measurement);
+    Sim3 error_ = C * v1->estimate() * v2->estimate().inverse();
+    _error = error_.log();
+  }
+
+  virtual double initialEstimatePossible(const OptimizableGraph::VertexSet&,
+                                         OptimizableGraph::Vertex*) {
+    return 1.;
+  }
+  virtual void initialEstimate(const OptimizableGraph::VertexSet& from,
+                               OptimizableGraph::Vertex* /*to*/) {
+    VertexSim3Expmap* v1 = static_cast<VertexSim3Expmap*>(_vertices[0]);
+    VertexSim3Expmap* v2 = static_cast<VertexSim3Expmap*>(_vertices[1]);
+    if (from.count(v1) > 0)
+      v2->setEstimate(measurement() * v1->estimate());
+    else
+      v1->setEstimate(measurement().inverse() * v2->estimate());
+  }
+#if G2O_SIM3_JACOBIAN
+  virtual void linearizeOplus();
+#endif
+};
+
+/**/
+class G2O_TYPES_SIM3_API EdgeSim3ProjectXYZ
+    : public BaseBinaryEdge<2, Vector2, VertexPointXYZ, VertexSim3Expmap> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSim3ProjectXYZ();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+
+  virtual bool setMeasurementData(const double* m) {
+    Eigen::Map<const Vector2> v(m);
+    setMeasurement(v);
+    return true;
+  }
+
+  virtual bool getMeasurementData(double* m) const {
+    Eigen::Map<Vector2> v(m);
+    v = measurement();
+    return true;
+  }
+
+  virtual int measurementDimension() const { return 2; }
+
+  void computeError() {
+    const VertexSim3Expmap* v1 =
+        static_cast<const VertexSim3Expmap*>(_vertices[1]);
+    const VertexPointXYZ* v2 = static_cast<const VertexPointXYZ*>(_vertices[0]);
+
+    Vector2 obs(_measurement);
+    _error = obs - v1->cam_map1(project(v1->estimate().map(v2->estimate())));
+  }
+
+  // virtual void linearizeOplus();
+};
+
+/**/
+class G2O_TYPES_SIM3_API EdgeInverseSim3ProjectXYZ
+    : public BaseBinaryEdge<2, Vector2, VertexPointXYZ, VertexSim3Expmap> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeInverseSim3ProjectXYZ();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+
+  virtual bool setMeasurementData(const double* m) {
+    Eigen::Map<const Vector2> v(m);
+    setMeasurement(v);
+    return true;
+  }
+
+  virtual bool getMeasurementData(double* m) const {
+    Eigen::Map<Vector2> v(m);
+    v = measurement();
+    return true;
+  }
+
+  virtual int measurementDimension() const { return 2; }
+
+  void computeError() {
+    const VertexSim3Expmap* v1 =
+        static_cast<const VertexSim3Expmap*>(_vertices[1]);
+    const VertexPointXYZ* v2 = static_cast<const VertexPointXYZ*>(_vertices[0]);
+
+    Vector2 obs(_measurement);
+    _error = obs - v1->cam_map2(
+                       project(v1->estimate().inverse().map(v2->estimate())));
+  }
+
+  // virtual void linearizeOplus();
+};
+
+}  // namespace g2o
 
 #endif
